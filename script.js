@@ -1,91 +1,91 @@
-(function($) {
-    
-	$(document).ready(function(){
+(function ($) {
 
-		$('#updateoffers').click(function() {
-			$(this).parents('li').hide();
-			$('#ymlprogress').show();
+    $(document).ready(function () {
 
-			window.offerunlock = 'yes';
+        $('#updateoffers').click(function () {
+            $(this).parents('li').hide();
+            $('#ymlprogress').show();
 
-			updateoffers();
+            window.offerunlock = 'yes';
 
-			return false;
+            updateoffers();
 
-		});
+            return false;
 
-
-		var updateoffers = function(){
-
-			var data = {action: $('.woocommerce form input[name="key_source"]').val()+'_ajaxUpdateOffers', unlock: offerunlock};
-
-			console.log(data);
-
-			$.ajax({
-				url: ajaxurl,
-				type: 'POST',
-				dataType: 'json',
-				data: data,
-				success: function(data){
-
-					console.log(data);
-
-					window.offerunlock = 'no';
-
-					if( !data.ismakeyml ){
-						updateoffers();
-					}else{
-						$('#ymlprogress').hide();
-						$('#updateoffers').parents('li').show();
-					}
-				}
-			})
-			.done(function() {
-				console.log("success");
-			})
-			.fail(function(data) {
-				$.post(ajaxurl, {action: 'yml_send_log'});
-				alert('Случилась беда. Логи работы скрипта уже ушли на почту разработчику, он их обрабатывает и скоро с Вами свяжется');
-			})
-			.always(function() {
-				console.log("complete");
-			});
-		}
+        });
 
 
-		$('#add_source').click(function(){
+        var updateoffers = function () {
 
-			var name = prompt( 'Введите имя нового источника' );
+            var data = {action: $('.woocommerce form input[name="key_source"]').val() + '_ajaxUpdateOffers', unlock: offerunlock};
 
-			if( typeof name != 'object' ){
+            console.log(data);
 
-				$.post(ajaxurl, {action: 'add_yml_source', name : name}, function(data, textStatus, xhr) {
-					window.location.href = window.location.href;
-				});
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                dataType: 'json',
+                data: data,
+                success: function (data) {
 
-			}
+                    console.log(data);
 
-			return false;
-		});
+                    window.offerunlock = 'no';
+
+                    if (!data.ismakeyml) {
+                        updateoffers();
+                    } else {
+                        $('#ymlprogress').hide();
+                        $('#updateoffers').parents('li').show();
+                    }
+                }
+            })
+                .done(function () {
+                    console.log("success");
+                })
+                .fail(function (data) {
+                    $.post(ajaxurl, {action: 'yml_send_log'});
+                    alert('Сталася помилка. LOG файли роботи скрипта вже пішли на пошту розробнику info@promuabot.com, він їх обробляє і скоро з Вами зв\'яжеться');
+                })
+                .always(function () {
+                    console.log("complete");
+                });
+        };
 
 
-		if( $('.woocommerce form input[name="key_surce"]').val() != '_yandex_market' )
-			$('.woocommerce form p.submit input[name="save"]').replaceWith(
-				'<input name="save" class="button-primary" type="submit" value="Сохранить изменения"> <input name="delete" class="button-primary delete" type="submit" value="Удалить">'
-			);
+        $('#add_source').click(function () {
 
-		$('.woocommerce form p.submit input[name="delete"]').live('click', function(event) {
+            var name = prompt('Введіть ім\'я нового джерела');
 
-			if( confirm('Вы действительно хотите удалить источник?') ){
-				$.post(ajaxurl, {action: 'del_yml_source', key : $('.woocommerce form input[name="key_source"]').val() }, function(data, textStatus, xhr) {
-					window.location.href = window.location.href+"&source=_yandex_market";
-				});				
-			}
+            if (typeof name != 'object') {
 
+                $.post(ajaxurl, {action: 'add_yml_source', name: name}, function (data, textStatus, xhr) {
+                    window.location.href = window.location.href;
+                });
 
-			return false;
-		});
+            }
+
+            return false;
+        });
 
 
-	});
+        if ($('.woocommerce form input[name="key_surce"]').val() != '_yandex_market')
+            $('.woocommerce form p.submit input[name="save"]').replaceWith(
+                '<input name="save" class="button-primary" type="submit" value="Зберегти зміни"> <input name="delete" class="button-primary delete" type="submit" value="Видалити">'
+            );
+
+        $('.woocommerce form p.submit input[name="delete"]').live('click', function (event) {
+
+            if (confirm('Ви дійсно хочете видалити джерело?')) {
+                $.post(ajaxurl, {action: 'del_yml_source', key: $('.woocommerce form input[name="key_source"]').val()}, function (data, textStatus, xhr) {
+                    window.location.href = window.location.href + "&source=_yandex_market";
+                });
+            }
+
+
+            return false;
+        });
+
+
+    });
 })(jQuery);

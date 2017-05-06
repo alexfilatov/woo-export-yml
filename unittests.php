@@ -3,51 +3,53 @@
 class WooExportYmlUnitTests
 {
 
-	function __construct( $ymlApi )
-	{
-		$this->ymlApi 		= $ymlApi;
-		$this->blackList 	= array(
-			'__construct','process'
-		);
+    function __construct($ymlApi)
+    {
+        $this->ymlApi = $ymlApi;
+        $this->blackList = array(
+            '__construct', 'process'
+        );
 
-		
-	}
 
-	public function process(){
+    }
 
-		$this->ymlApi->debugOn();
+    public function process()
+    {
 
-		$checks = get_class_methods($this);
+        $this->ymlApi->debugOn();
 
-		foreach ($checks as $check) {
-			if( !in_array( $check, $this->blackList ) ){
+        $checks = get_class_methods($this);
 
-				$check_result = $this->{$check}();
+        foreach ($checks as $check) {
+            if (!in_array($check, $this->blackList)) {
 
-				if( $check_result !== false ){
-					$this->ymlApi->bread('test:'.$check.':fail, '.$check_result );
-				}
-			}
-		}
+                $check_result = $this->{$check}();
 
-		$this->ymlApi->debugOff();
-	}
+                if ($check_result !== false) {
+                    $this->ymlApi->bread('test:' . $check . ':fail, ' . $check_result);
+                }
+            }
+        }
 
-	public function checkProcess(){
+        $this->ymlApi->debugOff();
+    }
 
-		$this->ymlApi->inProcessSet('yes');
+    public function checkProcess()
+    {
 
-		if( !$this->ymlApi->inProcess() )
-			return -1;
+        $this->ymlApi->inProcessSet('yes');
 
-		$this->ymlApi->inProcessSet('no');
+        if (!$this->ymlApi->inProcess())
+            return -1;
 
-		if( $this->ymlApi->inProcess() )
-			return -2;
-		
+        $this->ymlApi->inProcessSet('no');
 
-		return true;
-	}
+        if ($this->ymlApi->inProcess())
+            return -2;
+
+
+        return true;
+    }
 
 }
 

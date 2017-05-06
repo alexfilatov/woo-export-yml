@@ -1,62 +1,64 @@
 <?php
 
 
-
 class WooExportYmlFunctions
 {
 
 
+    public static function substr($text, $max, $removelastword = true)
+    {
 
-	public static function substr( $text, $max, $removelastword = true ){
-		
-		$text = mb_substr($text, 0, $max );
+        $text = mb_substr($text, 0, $max);
 
-		if( $removelastword ){
-			$text = explode('. ', $text );
-			unset( $text[ count( $text ) -1 ] );
-			$text = implode('. ', $text );
-		}
+        if ($removelastword) {
+            $text = explode('. ', $text);
+            unset($text[count($text) - 1]);
+            $text = implode('. ', $text);
+        }
 
-		return $text;
-	}
+        return $text;
+    }
 
-	public static function sanitize( $url ){
+    public static function sanitize($url)
+    {
 
-		if( empty( $url  ) )
-			return false;
+        if (empty($url))
+            return false;
 
-		$_p = explode('/', str_replace(home_url('/'), "", $url ));
-		$_a = array();
-		
-		foreach($_p as $v_ulr) {
-			$_a[] = rawurlencode($v_ulr);
-		}
-		
-		$_u = home_url('/').implode('/', $_a );
+        $_p = explode('/', str_replace(home_url('/'), "", $url));
+        $_a = array();
 
-		return $_u;
-	}
+        foreach ($_p as $v_ulr) {
+            $_a[] = rawurlencode($v_ulr);
+        }
 
-	public static function del_symvol($str){
+        $_u = home_url('/') . implode('/', $_a);
 
-		$tr = array(
-			";"=>" ",":"=>" ",">"=>" ","«"=>" ",
-			"»"=>" ","\""=>" ","@"=>" ","#"=>" ","$"=>" ",
-			"*" => " ", "%" => " ", "&" => " "
-	 	);
+        return $_u;
+    }
 
-		return strtr($str,$tr);
-	}
+    public static function del_symvol($str)
+    {
 
-	public function print_gzencode_output( $filename ){ 
+        $tr = array(
+            ";" => " ", ":" => " ", ">" => " ", "«" => " ",
+            "»" => " ", "\"" => " ", "@" => " ", "#" => " ", "$" => " ",
+            "*" => " ", "%" => " ", "&" => " "
+        );
 
-	    $contents = ob_get_clean(); 
+        return strtr($str, $tr);
+    }
 
-		header('Content-Disposition: attachment; filename="'.$filename.'"');
-	    header('Content-Encoding: gzip'); 
-	    $contents = gzencode($contents, 9); 
-	    print($contents); 
+    public function print_gzencode_output($filename)
+    {
 
-	} 
+        $contents = ob_get_clean();
+
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Encoding: gzip');
+        $contents = gzencode($contents, 9);
+        print($contents);
+
+    }
 
 }

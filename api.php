@@ -3,1081 +3,1105 @@
 
 class WooExportYmlApi
 {
-	
-	
-	private $id;			// ID плагина, для нескольких вариантов yml выгрузки
-	private $name;			// Имя типа выгрузки
-
-	private $currentpage; 	// Текущая страница выгрузки
-	private $isdeliver;		// Управление доставкой, включена или нет
-	private $isstore;		// Наличие точки продаж 
-	private $iscpa; 		// Покупка на маркете
-	private $bid;			// Цена ставки
-	private $isbid;			// Управление ставками, включено или нет
-	private $isexportattr;	// Выгружать свойства, да или нет
-	private $vendors; 		// Определена ли таксономия бренда
-	private $salesNote; 	// Заметка к продаже
-	private $isMakeYml; 	// Определяет, выгрузился ли до конца товар
-	private $debug;			// Включает дебаг при выгрузке
-	private $isgroupidattr; // Добавление атрибута group_id к вариативным товарам
-
-	function __construct( $export_id, $settings )
-	{
-
-	
-		$this->id 				= $export_id;
-		$this->shellPrefix 		= $export_id;
 
 
-		$this->currentpage		= ( get_option($this->id.'_page') ) ? get_option($this->id.'_page') : 1;
-		$this->pages			= ( get_option($this->id.'_pages') ) ? get_option($this->id.'_pages') : 1;
-		$this->isMakeYml		= false;
-		$this->debug 			= false;
-		$this->posts 			= get_option($this->id.'_get_ids');
-		$this->md5offer			= array();
+    private $id;            // ID плагина, для нескольких вариантов yml выгрузки
+    private $name;            // Имя типа выгрузки
 
-		$def_settings = array(
-			'isdeliver' 		=> false,
-			'isexportattr' 		=> false,
-			'isexporpictures' 	=> false,
-			'ispickup' 			=> 'false',
-			'isstore' 			=> 'false',
-			'cpa' 				=> false,
-			'isgroupidattr'     => false,
-			'bid' 				=> false,
-			'isbid' 			=> false,
-			'vendors' 			=> false,
-			'salesNote' 		=> ''
-		);
+    private $currentpage;    // Текущая страница выгрузки
+    private $isdeliver;        // Управление доставкой, включена или нет
+    private $isstore;        // Наличие точки продаж
+    private $iscpa;        // Покупка на маркете
+    private $bid;            // Цена ставки
+    private $isbid;            // Управление ставками, включено или нет
+    private $isexportattr;    // Выгружать свойства, да или нет
+    private $vendors;        // Определена ли таксономия бренда
+    private $salesNote;    // Заметка к продаже
+    private $isMakeYml;    // Определяет, выгрузился ли до конца товар
+    private $debug;            // Включает дебаг при выгрузке
+    private $isgroupidattr; // Добавление атрибута group_id к вариативным товарам
 
-		foreach( $def_settings as $set => $val ){
-			
-			if( isset( $settings[ $set ] ) )
-				$this->{$set} = $settings[ $set ];
-			else
-				$this->{$set} = $val;
-		
-		}
-		
-		add_action('init', array( $this, 'init') );
+    function __construct($export_id, $settings)
+    {
 
-		
-		if( isset($_GET['tab']) && $_GET['tab'] == $this->id and  isset( $_REQUEST['save'] ) ){
-			$this->action_unlock();
-		}
 
-		
-		$this->unitTests = new WooExportYmlUnitTests( $this );
-	}
+        $this->id = $export_id;
+        $this->shellPrefix = $export_id;
 
 
-	public function add_htaccess_rule( $rules ){
+        $this->currentpage = (get_option($this->id . '_page')) ? get_option($this->id . '_page') : 1;
+        $this->pages = (get_option($this->id . '_pages')) ? get_option($this->id . '_pages') : 1;
+        $this->isMakeYml = false;
+        $this->debug = false;
+        $this->posts = get_option($this->id . '_get_ids');
+        $this->md5offer = array();
 
-	    $rules .= "RewriteRule ^".$this->id.".xml index.php\n";
-	    $rules .= "RewriteRule ^".$this->id.".xml.gz index.php\n";
+        $def_settings = array(
+            'isdeliver' => false,
+            'isexportattr' => false,
+            'isexporpictures' => false,
+            'ispickup' => 'false',
+            'isstore' => 'false',
+            'cpa' => false,
+            'isgroupidattr' => false,
+            'bid' => false,
+            'isbid' => false,
+            'vendors' => false,
+            'salesNote' => ''
+        );
 
-	    return $rules;
-	}
+        foreach ($def_settings as $set => $val) {
 
+            if (isset($settings[$set]))
+                $this->{$set} = $settings[$set];
+            else
+                $this->{$set} = $val;
 
-	/*
-		Инициализация	
-	*/
-	public function init(){
+        }
 
+        add_action('init', array($this, 'init'));
 
-		add_filter('mod_rewrite_rules', array($this, 'add_htaccess_rule'));
 
-		add_action( "added_post_meta", array($this, 'generateOffer'), 10, 2); 
-		add_action( 'updated_postmeta', array($this, 'generateOffer'), 10, 2);
-		add_action( 'wp_insert_post', array($this, 'wp_insert_post'), 1, 2);
-		add_action( 'set_object_terms', array($this, 'set_object_terms'), 1);
+        if (isset($_GET['tab']) && $_GET['tab'] == $this->id and isset($_REQUEST['save'])) {
+            $this->action_unlock();
+        }
 
-		add_action( 'wp_ajax_'.$this->id.'_ajaxUpdateOffers', array( $this, 'ajaxUpdateOffers' ) );
 
-		$this->shell();
-		$this->getYmlAction();
-	}
+        $this->unitTests = new WooExportYmlUnitTests($this);
+    }
 
 
-	public function getYmlAction(){
+    public function add_htaccess_rule($rules)
+    {
 
-		if ( get_option('permalink_structure') != '' ) { 
+        $rules .= "RewriteRule ^" . $this->id . ".xml index.php\n";
+        $rules .= "RewriteRule ^" . $this->id . ".xml.gz index.php\n";
 
-			$url = parse_url( 'http://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] );
+        return $rules;
+    }
 
-			if( $url['path'] == '/'.$this->id.'.xml' ){
-				$this->getYml();
-				die;
-			}
 
-			if( $url['path'] == '/'.$this->id.'.xml.gz' ){
-				$this->getYml(true);
-				die;
-			}
+    /*
+        Инициализация
+    */
+    public function init()
+    {
 
-		}else{
 
-			if( isset( $_GET[$this->id.'_export'] ) ){
+        add_filter('mod_rewrite_rules', array($this, 'add_htaccess_rule'));
 
-				$gzip = ( isset( $_GET['gzip'] ) ) ? true : false;
-				$this->getYml($gzip);
-				die;
+        add_action("added_post_meta", array($this, 'generateOffer'), 10, 2);
+        add_action('updated_postmeta', array($this, 'generateOffer'), 10, 2);
+        add_action('wp_insert_post', array($this, 'wp_insert_post'), 1, 2);
+        add_action('set_object_terms', array($this, 'set_object_terms'), 1);
 
-			}
+        add_action('wp_ajax_' . $this->id . '_ajaxUpdateOffers', array($this, 'ajaxUpdateOffers'));
 
-		}
+        $this->shell();
+        $this->getYmlAction();
+    }
 
-	}
 
+    public function getYmlAction()
+    {
 
-	public function bread( $text ){
+        if (get_option('permalink_structure') != '') {
 
+            $url = parse_url('http://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']);
 
-		if( is_string( $text ) )
-			$result =  $text."\n";
+            if ($url['path'] == '/' . $this->id . '.xml') {
+                $this->getYml();
+                die;
+            }
 
-		elseif( is_array( $text ) or is_object( $text ) )
-			$result = print_r($text, true)."\n";
+            if ($url['path'] == '/' . $this->id . '.xml.gz') {
+                $this->getYml(true);
+                die;
+            }
 
-		$this->bread[] = $result;		
+        } else {
 
-		if( $this->debug )
-			echo $result;
-		
-		
-		if( date('j') == '1' ){
-			unlink( dirname(__FILE__)."/".$this->id."_process.log" );
-		}
+            if (isset($_GET[$this->id . '_export'])) {
 
-		file_put_contents(dirname(__FILE__)."/".$this->id."_process.log", $result, FILE_APPEND );
-			
-	}
+                $gzip = (isset($_GET['gzip'])) ? true : false;
+                $this->getYml($gzip);
+                die;
 
-	/*
-		Метод позволяет узнать запущен ли процесс выгрузки
-	*/
-	final public function inProcess(){
+            }
 
-		$inProcess = get_option($this->id.'_in_process');
+        }
 
-		if( empty( $inProcess ) ){
-			update_option($this->id.'_in_process', 'no');
-			return false;
-		}
+    }
 
-		if( $inProcess == 'no' )
-			return false;
-		else
-			return true;
 
-	}
+    public function bread($text)
+    {
 
-	/*
-		Позволяет установить статус процесса экспорта.
-		Используется на странице настроек. Показывает статус выполнения.
-	*/
-	final public function inProcessSet( $set ){
 
-		if( in_array( $set, array('yes','no' ) ) )
-			update_option($this->id.'_in_process', $set);
+        if (is_string($text))
+            $result = $text . "\n";
 
-	}
+        elseif (is_array($text) or is_object($text))
+            $result = print_r($text, true) . "\n";
 
+        $this->bread[] = $result;
 
-	/*
-		Устанавливает страницу выгрузки
-	*/
-	final public function setPage( $page ){
-		$this->currentpage = $page;
-		update_option($this->id.'_page', $page );
-	}
+        if ($this->debug)
+            echo $result;
 
 
-	/*
-		Включает вывод отладочной информации
-	*/
-	public function debugOn(){
-		$this->debug = true;
-	}
+        if (date('j') == '1') {
+            unlink(dirname(__FILE__) . "/" . $this->id . "_process.log");
+        }
 
+        file_put_contents(dirname(__FILE__) . "/" . $this->id . "_process.log", $result, FILE_APPEND);
 
-	/*
-		Выключает вывод отладочной информации
-	*/
-	public function debugOff(){
-		$this->debug = false;
-	}
+    }
 
-	/*
-		Блокирует выгрузку для того чтобы если случайно включится второй процесс выгрузки одновременно, 
-		то второй процесс завершится при проверке методом isLock()
-	*/
-	final public function exportLock(){
-		update_option($this->id .'_lock', true );
-	}
+    /*
+        Метод позволяет узнать запущен ли процесс выгрузки
+    */
+    final public function inProcess()
+    {
 
-	/*
-		Разблокирует выгрузку, противоположность вышестоящему методу 
-	*/
-	final public function exportUnlock(){
-		update_option($this->id .'_lock', false );
-	}
+        $inProcess = get_option($this->id . '_in_process');
 
-	/*
-		Проверяет заблокирована ли выгрузка
-	*/
-	final public function isLock(){
-		return get_option( $this->id .'_lock' );
-	}
+        if (empty($inProcess)) {
+            update_option($this->id . '_in_process', 'no');
+            return false;
+        }
 
-	/*
-		Выгружает используемые категории в YML формате
-	*/
-	final public function renderCats(){
+        if ($inProcess == 'no')
+            return false;
+        else
+            return true;
 
-		$get_terms = $this->getRelationsTax();
+    }
 
+    /*
+        Позволяет установить статус процесса экспорта.
+        Используется на странице настроек. Показывает статус выполнения.
+    */
+    final public function inProcessSet($set)
+    {
 
-		if( !empty( $get_terms['product_cat'] ) )
-			if( in_array('all', $get_terms['product_cat'] ) )
-				$terms = get_terms( 'product_cat' );
-			else
-				$terms = get_terms( 'product_cat', array('include' => $get_terms['product_cat'] ) );
-		else
-			$terms = get_terms( 'product_cat' );	
+        if (in_array($set, array('yes', 'no')))
+            update_option($this->id . '_in_process', $set);
 
-		if( !empty( $terms ) ){
+    }
 
-			$yml = '<categories>'."\n";
 
-			foreach ( $terms as $key => $cat ) {
+    /*
+        Устанавливает страницу выгрузки
+    */
+    final public function setPage($page)
+    {
+        $this->currentpage = $page;
+        update_option($this->id . '_page', $page);
+    }
 
-				$parent = ( $cat->parent ) ? 'parentId="'.$cat->parent.'"' : '';
 
-				$yml .= "\t\t".'<category id="'.$cat->term_id.'" '.$parent.'>'.$cat->name.'</category>'."\n";
-			}
+    /*
+        Включает вывод отладочной информации
+    */
+    public function debugOn()
+    {
+        $this->debug = true;
+    }
 
-			$yml .= '</categories>'."\n";
-			
-			$yml = apply_filters( $this->id.'_render_cats', $yml );
 
-			return $yml;
+    /*
+        Выключает вывод отладочной информации
+    */
+    public function debugOff()
+    {
+        $this->debug = false;
+    }
 
-		}
-	}
+    /*
+        Блокирует выгрузку для того чтобы если случайно включится второй процесс выгрузки одновременно,
+        то второй процесс завершится при проверке методом isLock()
+    */
+    final public function exportLock()
+    {
+        update_option($this->id . '_lock', true);
+    }
 
-	/*
-		Выгружает валюту в YML формате
-	*/
-	final public function renderCurrency(){
+    /*
+        Разблокирует выгрузку, противоположность вышестоящему методу
+    */
+    final public function exportUnlock()
+    {
+        update_option($this->id . '_lock', false);
+    }
 
-		$yml = '<currency id="'.apply_filters( 'woocommerce_currency', get_option('woocommerce_currency') ).'" rate="1"/>';
+    /*
+        Проверяет заблокирована ли выгрузка
+    */
+    final public function isLock()
+    {
+        return get_option($this->id . '_lock');
+    }
 
-		$yml = apply_filters( $this->id.'_render_currency', $yml );
+    /*
+        Выгружает используемые категории в YML формате
+    */
+    final public function renderCats()
+    {
 
-		return $yml;
-	}
+        $get_terms = $this->getRelationsTax();
 
 
-	/*
-		Получает свойства товара
-	*/
-	final public function getProductAttributes( $product ){
+        if (!empty($get_terms['product_cat']))
+            if (in_array('all', $get_terms['product_cat']))
+                $terms = get_terms('product_cat');
+            else
+                $terms = get_terms('product_cat', array('include' => $get_terms['product_cat']));
+        else
+            $terms = get_terms('product_cat');
 
+        if (!empty($terms)) {
 
-		$attributes = $product->get_attributes();
-		$out_attr 	= '';
+            $yml = '<categories>' . "\n";
 
-		foreach ( $attributes as $key => $attribute ){
+            foreach ($terms as $key => $cat) {
 
-			if (  $attribute['is_taxonomy'] && ! taxonomy_exists( $attribute['name'] )  ) 
-				continue;
+                $parent = ($cat->parent) ? 'parentId="' . $cat->parent . '"' : '';
 
-			$name = wc_attribute_label( $attribute['name'] );
+                $yml .= "\t\t" . '<category id="' . $cat->term_id . '" ' . $parent . '>' . $cat->name . '</category>' . "\n";
+            }
 
-			if ( $attribute['is_taxonomy'] ) {
+            $yml .= '</categories>' . "\n";
 
-				if ( $product->product_type == 'variation' && array_key_exists('attribute_'.$attribute['name'], $product->variation_data) ){
+            $yml = apply_filters($this->id . '_render_cats', $yml);
 
-					$value = apply_filters( 'woocommerce_attribute', $product->variation_data['attribute_'.$attribute['name']]);
+            return $yml;
 
-				}
+        }
+    }
 
-				if ( $product->product_type != 'variation' || empty($value) ){
-					$values = wc_get_product_terms( $product->id, $attribute['name'], array( 'fields' => 'names' ) );
-					$value = apply_filters( 'woocommerce_attribute', wptexturize( implode( ', ', $values ) ) , $attribute, $values );
-				}
+    /*
+        Выгружает валюту в YML формате
+    */
+    final public function renderCurrency()
+    {
 
-			} else {
+        $yml = '<currency id="' . apply_filters('woocommerce_currency', get_option('woocommerce_currency')) . '" rate="1"/>';
 
-				if ( $product->product_type == 'variation' && array_key_exists('attribute_'.$attribute['name'], $product->variation_data) ){
+        $yml = apply_filters($this->id . '_render_currency', $yml);
 
-					$value = apply_filters( 'woocommerce_attribute', $product->variation_data['attribute_'.$attribute['name']]);
+        return $yml;
+    }
 
-				} else {
-					// Convert pipes to commas and display values
-					$values = array_map( 'trim', explode( WC_DELIMITER, $attribute['value'] ) );
-					$value = apply_filters( 'woocommerce_attribute',  wptexturize( implode( ', ', $values ) ) , $attribute, $values );
-				}
-			}
 
-			if( !empty( $value ) and !empty( $name ) ){
-				$out_attr .= '<param name="'.$name.'">'.$value.'</param>'."\n";
-			}
+    /*
+        Получает свойства товара
+    */
+    final public function getProductAttributes($product)
+    {
 
-		}
 
-		$out_attr = apply_filters( $this->id.'_export_attributes', $out_attr, $product, $attributes );
+        $attributes = $product->get_attributes();
+        $out_attr = '';
 
-		return $out_attr;
+        foreach ($attributes as $key => $attribute) {
 
-	}
+            if ($attribute['is_taxonomy'] && !taxonomy_exists($attribute['name']))
+                continue;
 
-	/*
-		Получает изображения товара
-	*/
-	final public function getImagesProduct( $product ){
+            $name = wc_attribute_label($attribute['name']);
 
+            if ($attribute['is_taxonomy']) {
 
-		$images = array();
+                if ($product->product_type == 'variation' && array_key_exists('attribute_' . $attribute['name'], $product->variation_data)) {
 
-		if ($product->product_type == 'variation' && method_exists( $product, 'get_image_id'  ) ){
-			$image_id = $product->get_image_id();
-		} else {
-			$image_id = get_post_thumbnail_id( $product->id );
-		}
+                    $value = apply_filters('woocommerce_attribute', $product->variation_data['attribute_' . $attribute['name']]);
 
-		$general_image = WooExportYmlFunctions::sanitize( wp_get_attachment_url( $image_id ) );
+                }
 
+                if ($product->product_type != 'variation' || empty($value)) {
+                    $values = wc_get_product_terms($product->id, $attribute['name'], array('fields' => 'names'));
+                    $value = apply_filters('woocommerce_attribute', wptexturize(implode(', ', $values)), $attribute, $values);
+                }
 
+            } else {
 
-		if( !empty( $general_image ) )
-			$images[] = $general_image;
+                if ($product->product_type == 'variation' && array_key_exists('attribute_' . $attribute['name'], $product->variation_data)) {
 
-		if( $this->isexporpictures ){
+                    $value = apply_filters('woocommerce_attribute', $product->variation_data['attribute_' . $attribute['name']]);
 
-			$ids 	= $product->get_gallery_attachment_ids();		
+                } else {
+                    // Convert pipes to commas and display values
+                    $values = array_map('trim', explode(WC_DELIMITER, $attribute['value']));
+                    $value = apply_filters('woocommerce_attribute', wptexturize(implode(', ', $values)), $attribute, $values);
+                }
+            }
 
-			if( !empty( $ids ) ){
+            if (!empty($value) and !empty($name)) {
+                $out_attr .= '<param name="' . $name . '">' . $value . '</param>' . "\n";
+            }
 
-				foreach ($ids as $id) {
+        }
 
-					$image = wp_get_attachment_image_src( $id , 'full');
+        $out_attr = apply_filters($this->id . '_export_attributes', $out_attr, $product, $attributes);
 
-					if( !empty( $image[0] ) )
+        return $out_attr;
 
-					$images[] = WooExportYmlFunctions::sanitize( $image[0] );
+    }
 
-				}
+    /*
+        Получает изображения товара
+    */
+    final public function getImagesProduct($product)
+    {
+        $images = array();
 
-			}
-		}
+        if ($product->product_type == 'variation' && method_exists($product, 'get_image_id')) {
+            $image_id = $product->get_image_id();
+        } else {
+            $image_id = get_post_thumbnail_id($product->id);
+        }
 
-		return $images;
+        $general_image = WooExportYmlFunctions::sanitize(wp_get_attachment_url($image_id));
 
-	}
 
-	/*
-		Установка параметров для выгрузки Offer
-	*/
-	final public function setOfferParams( $product ){
+        if (!empty($general_image))
+            $images[] = $general_image;
 
-		$terms = wp_get_post_terms( $product->id, 'product_cat' );
+        if ($this->isexporpictures) {
 
-		if( !empty( $terms ) )
-			$cat  = $terms[0]->term_id;
-		else{
-			$this->bread('cat not set id='.$product->id );
-			return false;
-		}
+            $ids = $product->get_gallery_attachment_ids();
 
-		$excerpt 		= trim( $product->post->post_excerpt );
-		$description 	= ( !empty( $excerpt  ) ) ? $excerpt : $product->post->post_content;
-		$description 	= WooExportYmlFunctions::substr($description, 500, false );
+            if (!empty($ids)) {
 
-		if( $this->vendors == false )
-			$vendor = get_post_meta($product->id ,'_vendor', true );
+                foreach ($ids as $id) {
 
-		else{
+                    $image = wp_get_attachment_image_src($id, 'full');
 
-			$terms = wp_get_post_terms( $product->id, $this->vendors );
+                    if (!empty($image[0]))
 
-			if( !is_wp_error( $terms ) )
-			if( !empty( $terms[0] ) )
-				$vendor  = $terms[0]->name;
-			
-		}
+                        $images[] = WooExportYmlFunctions::sanitize($image[0]);
 
-		if( empty( $vendor ) )
-			$vendor = get_option( $this->id.'_def_vendor' );
-		
-		if( empty( $vendor ) )
-			$vendor = 'none';
+                }
 
+            }
+        }
 
-		$pictures = $this->getImagesProduct( $product );
+        return $images;
 
-		if( empty( $pictures ) )
-			return false;
+    }
 
+    /*
+        Установка параметров для выгрузки Offer
+    */
+    final public function setOfferParams($product)
+    {
 
+        $terms = wp_get_post_terms($product->id, 'product_cat');
 
-		$params = array(
-			'url' 			=> WooExportYmlFunctions::sanitize(urldecode( esc_attr($product->get_permalink()) )),
-			'price' 		=> $product->get_price(),
-			'currencyId'	=> 'RUR',
-			'categoryId' 	=> $cat,
-			'picture' 		=> $pictures,
-			'store'			=> ( $this->isdeliver and !$this->cpa  ) ? $this->isstore : '',
-			'pickup'		=> ( $this->isdeliver and !$this->cpa  ) ? $this->ispickup : '',
-			'delivery'		=> ( $this->isdeliver and !$this->cpa  ) ? 'true' : '',
-			'vendor'		=> $vendor,
-			'model' 		=> WooExportYmlFunctions::del_symvol( strip_tags( $product->post->post_title ) ),
-			'description' 	=> WooExportYmlFunctions::del_symvol( strip_tags( $description ) ),
-			'sales_notes'	=> ( !empty( $this->salesNote ) ) ? WooExportYmlFunctions::substr( $this->salesNote, 50, false ) : '',
-			'cpa' 			=> ( $this->cpa ) ? $this->cpa : '',
-		);
+        if (!empty($terms))
+            $cat = $terms[0]->term_id;
+        else {
+            $this->bread('cat not set id=' . $product->id);
+            return false;
+        }
 
+        $excerpt = trim($product->post->post_excerpt);
+        $description = (!empty($excerpt)) ? $excerpt : $product->post->post_content;
+        $description = WooExportYmlFunctions::substr($description, 500, false);
 
-		$params = apply_filters( $this->id.'_set_offer_params', $params, $product );
+        if ($this->vendors == false)
+            $vendor = get_post_meta($product->id, '_vendor', true);
 
-		if( empty( $params['vendor'] ) ){
-			$this->bread('vendor not set id='.$product->id );
-			return false;
-		}
+        else {
 
-		if( empty( $params['model'] ) ){
-			$this->bread('model not set id='.$product->id );
-			return false;
-		}
+            $terms = wp_get_post_terms($product->id, $this->vendors);
 
+            if (!is_wp_error($terms))
+                if (!empty($terms[0]))
+                    $vendor = $terms[0]->name;
 
-		if( $params['price'] == 0 )
-			return false;
+        }
 
+        if (empty($vendor))
+            $vendor = get_option($this->id . '_def_vendor');
 
-		// на всякий случай, если кто то переопределил через фильтр.
-		$params['sales_notes'] = WooExportYmlFunctions::substr( $params['sales_notes'], 50, false );
+        if (empty($vendor))
+            $vendor = 'none';
 
-		return $params;
-	}
 
+        $pictures = $this->getImagesProduct($product);
 
-	/*
-		Выгружает часть товаров. Часть это кол-во товаров на странице, определяется параметром $perpage в makeQuery
-	*/
-	final public function renderPartOffers(){
+        if (empty($pictures))
+            return false;
 
-		$products = $this->makeQuery();
 
-		if( $products->post_count == $products->found_posts )
-			$this->isMakeYml = true;
+        $params = array(
+            'url' => WooExportYmlFunctions::sanitize(urldecode(esc_attr($product->get_permalink()))),
+            'price' => $product->get_price(),
+            'currencyId' => 'RUR',
+            'categoryId' => $cat,
+            'picture' => $pictures,
+            'store' => ($this->isdeliver and !$this->cpa) ? $this->isstore : '',
+            'pickup' => ($this->isdeliver and !$this->cpa) ? $this->ispickup : '',
+            'delivery' => ($this->isdeliver and !$this->cpa) ? 'true' : '',
+            'vendor' => $vendor,
+            'model' => WooExportYmlFunctions::del_symvol(strip_tags($product->post->post_title)),
+            'description' => WooExportYmlFunctions::del_symvol(strip_tags($description)),
+            'sales_notes' => (!empty($this->salesNote)) ? WooExportYmlFunctions::substr($this->salesNote, 50, false) : '',
+            'cpa' => ($this->cpa) ? $this->cpa : '',
+        );
 
-		if( $products->have_posts() ){
 
-			$this->bread('found posts');
+        $params = apply_filters($this->id . '_set_offer_params', $params, $product);
 
-			while ( $products->have_posts() ){
+        if (empty($params['vendor'])) {
+            $this->bread('vendor not set id=' . $product->id);
+            return false;
+        }
 
-				$products->the_post();
-				$product = get_product($products->post->ID);
-				
-				if ( $product->product_type == 'simple' ||  $product->product_type == 'variation'){
+        if (empty($params['model'])) {
+            $this->bread('model not set id=' . $product->id);
+            return false;
+        }
 
-					//не нужно включать вариации, у которых нет отличий от основного товара и других вариаций
-					if ($product->product_type == 'variation'){
-					
-						if (!$this->checkVariationUniqueness($product)){
-				
-							delete_post_meta($product->variation_id, $this->id.'_yml_offer');
-							$this->bread('WARNING: skipping product variation ID '.$product->variation_id.' (product ID '.$product->id.') — variation has no unique attributes');
-							continue;
-				
-						}
-					
-					}
-				
-					$this->renderPartOffer( $product );
-				
-				}
 
-			}
-			
-			wp_reset_postdata();
+        if ($params['price'] == 0)
+            return false;
 
-			$this->setPage( $this->currentpage+1 );
 
-		}else{
-			$this->bread( 'no have posts' );
-			$this->isMakeYml = true;
-		}
-		
-		
-		
-	}
+        // на всякий случай, если кто то переопределил через фильтр.
+        $params['sales_notes'] = WooExportYmlFunctions::substr($params['sales_notes'], 50, false);
 
-	final public function renderPartOffer( $product ){
+        return $params;
+    }
 
-		$param = $this->setOfferParams( $product );
 
-		if ($product->product_type == 'variation'){
-			$product_id = $product->variation_id;
-		}else
-			$product_id = $product->id;
+    /*
+        Выгружает часть товаров. Часть это кол-во товаров на странице, определяется параметром $perpage в makeQuery
+    */
+    final public function renderPartOffers()
+    {
 
+        $products = $this->makeQuery();
 
-		if( !empty( $param ) ){
+        if ($products->post_count == $products->found_posts)
+            $this->isMakeYml = true;
 
-			$available  = ( $product->is_in_stock() == 'instock' ) ? "true" : "false";
-			$available 	= apply_filters( $this->id.'_set_offer_param_available', $available, $product );
+        if ($products->have_posts()) {
 
-			if( $this->isbid == true)
-				$bid = ( $this->bid ) ? 'bid="'.$this->bid.'"' : '';
-			else
-				$bid = "";
+            $this->bread('found posts');
 
-			$offer .= '<offer id="'.$product_id.'" type="vendor.model" available="'.$available.'" '.$bid;
+            while ($products->have_posts()) {
 
-			if ($product->product_type == 'variation' && $this->isgroupidattr && isset($product->parent->id) )
-				$offer.= ' group_id="' . $product->parent->id . '"';
-			
-			
-			$offer .= '>'."\n";
+                $products->the_post();
+                $product = get_product($products->post->ID);
 
-			foreach ($param as $key => $value){
+                if ($product->product_type == 'simple' || $product->product_type == 'variation') {
 
-				if( !empty( $value ) ){
+                    //не нужно включать вариации, у которых нет отличий от основного товара и других вариаций
+                    if ($product->product_type == 'variation') {
 
-					if( is_array( $value ) ){
-					
-						foreach ($value as $values) {
-							$offer .= "<$key>".$values."</$key>\n";
-						}
-					
-					}else{
-						$offer .= "<$key>".$value."</$key>\n";
-					}
+                        if (!$this->checkVariationUniqueness($product)) {
 
-				}
-			
-			}
+                            delete_post_meta($product->variation_id, $this->id . '_yml_offer');
+                            $this->bread('WARNING: skipping product variation ID ' . $product->variation_id . ' (product ID ' . $product->id . ') — variation has no unique attributes');
+                            continue;
 
-			if( $this->isexportattr ){
-				$offer .= $this->getProductAttributes( $product );
-			}
+                        }
 
-			$offer .= '</offer>'."\n";
+                    }
 
-			if( !empty( $offer ) ){
+                    $this->renderPartOffer($product);
 
-				$md5offer = md5( $offer );
+                }
 
-				if( !in_array( $md5offer, $this->md5offer ) ){
+            }
 
+            wp_reset_postdata();
 
+            $this->setPage($this->currentpage + 1);
 
-					$this->md5offer[] = $md5offer;
-					
-					update_post_meta( $product_id, $this->id.'_yml_offer', $offer );
+        } else {
+            $this->bread('no have posts');
+            $this->isMakeYml = true;
+        }
 
-					return true;
-				
-				}
-			}else{
-				update_post_meta( $product_id, $this->id.'_yml_offer', '' );
-				return false;
-			}
 
-		}else{
-			update_post_meta( $product_id, $this->id.'_yml_offer', '' );
-			return false;
-		}	
-	}
+    }
 
-	/*
-		Проверяет, отличается ли вариация товара от остальных
-	*/
-	final public function checkVariationUniqueness($variation){
+    final public function renderPartOffer($product)
+    {
 
-		$product = get_product( $variation->id );
-		
-		if ( ! is_object($product) || !($product instanceof WC_Product_Variable) )
-			return false;
+        $param = $this->setOfferParams($product);
 
-		if (method_exists($product, 'get_children'))
-			$children = $product->get_children();
-		else 
-			return false;
+        if ($product->product_type == 'variation') {
+            $product_id = $product->variation_id;
+        } else
+            $product_id = $product->id;
 
-		$differs 		= false;
-		$pairs_differ 	= array();
-		
-		foreach ($children as $_id){
 
-			$_variation = get_product($_id);
+        if (!empty($param)) {
 
-			if ( $_variation->variation_id == $variation->variation_id )
-				continue;
+            $available = ($product->is_in_stock() == 'instock') ? "true" : "false";
+            $available = apply_filters($this->id . '_set_offer_param_available', $available, $product);
 
-		
-			$pair_differs = false;
-		
-			foreach ( $variation->variation_data as $attr => $value ){
-				
-				foreach ( $_variation->variation_data as $attr_compare => $value_compare ){
-			
-					if ( $attr === $attr_compare && $value !== $value_compare ){
-						$pair_differs = true;
-						break;
-					}
-			
-				} 	
-			
-				if ( $pair_differs )
-					break;
-			
-			}
-			
-			$pairs_differ[] = $pair_differs;
+            if ($this->isbid == true)
+                $bid = ($this->bid) ? 'bid="' . $this->bid . '"' : '';
+            else
+                $bid = "";
 
-		}
+            $offer .= '<offer id="' . $product_id . '" type="vendor.model" available="' . $available . '" ' . $bid;
 
-		$differs = in_array(false, $pairs_differ) ? false : true;
+            if ($product->product_type == 'variation' && $this->isgroupidattr && isset($product->parent->id))
+                $offer .= ' group_id="' . $product->parent->id . '"';
 
-		return $differs;
 
-	}
+            $offer .= '>' . "\n";
 
-	final public function getShellArg(){
+            foreach ($param as $key => $value) {
 
-		/* В версии php ниже 5.3 не работают ключи с длинным именем, поэтому просто забиваем на эту версию */
-		$shell_arg = @getopt("",array( "wooexportyml_".$this->shellPrefix."::","debug::","unlock::",'fullexport::',"unittests::"));
+                if (!empty($value)) {
 
-		if( empty( $shell_arg ) )
-			$shell_arg = array();
-		else
-			$shell_arg = array_keys( $shell_arg );
-		
+                    if (is_array($value)) {
 
-		return $shell_arg;
-	}
+                        foreach ($value as $values) {
+                            $offer .= "<$key>" . $values . "</$key>\n";
+                        }
 
-	/*
-		Интерфейс для shell оболочки
-		Ключи:
-		--wooexportyml - Основной и обязательный, без него выгрузка не будет работать.
-		--debug        - вывод отладочной информации
-		--unlock       - разблокирует выгрузку если произошел сбой во время процесса и выгрузка будет начата сначала при следующем запуске
-		--fullexport   - Экспорт без учета времени последней выгрузки, а так же будет произведена выгрузка сразу всех товаров, а не партиями
-	*/
-	public function shell(){
+                    } else {
+                        $offer .= "<$key>" . $value . "</$key>\n";
+                    }
 
-		global $wpdb;
+                }
 
-		$shell_arg = $this->getShellArg();
+            }
 
+            if ($this->isexportattr) {
+                $offer .= $this->getProductAttributes($product);
+            }
 
-		if( in_array('wooexportyml_'.$this->shellPrefix, $shell_arg  ) ){
+            $offer .= '</offer>' . "\n";
 
+            if (!empty($offer)) {
 
-			if( in_array('unlock', $shell_arg ) ){
-				$this->action_unlock();
-				die;
-			}
+                $md5offer = md5($offer);
 
-			if( in_array('debug', $shell_arg ) ){
-				$this->debugOn();
-			}
+                if (!in_array($md5offer, $this->md5offer)) {
 
-			if( in_array( 'unittests', $shell_arg ) ){
 
-				$this->unitTests->process();
+                    $this->md5offer[] = $md5offer;
 
-				die;
-			}
+                    update_post_meta($product_id, $this->id . '_yml_offer', $offer);
 
+                    return true;
 
-			$this->action_fullexport();
-			die;
-		}
-	}
+                }
+            } else {
+                update_post_meta($product_id, $this->id . '_yml_offer', '');
+                return false;
+            }
 
-	/*
-		Действие, которые разблокирует выгрузку
-	*/
-	public function action_unlock(){
-		
-		$this->inProcessSet( 'no' );
-		$this->setPage( 1 );
-		$this->exportUnlock();
+        } else {
+            update_post_meta($product_id, $this->id . '_yml_offer', '');
+            return false;
+        }
+    }
 
-	}
+    /*
+        Проверяет, отличается ли вариация товара от остальных
+    */
+    final public function checkVariationUniqueness($variation)
+    {
 
-	/*
-		Экспорт без учета времени последней выгрузки, а так же будет произведена выгрузка сразу всех товаров, а не партиями
-	*/
-	public function action_fullexport(){
-		
-		$this->inProcessSet( 'no' );
-		$this->setPage( 1 );
-		$this->exportUnlock();
+        $product = get_product($variation->id);
 
-		while ( !$this->isMakeYml )
-			$this->export();
+        if (!is_object($product) || !($product instanceof WC_Product_Variable))
+            return false;
 
-	}
+        if (method_exists($product, 'get_children'))
+            $children = $product->get_children();
+        else
+            return false;
 
-	/*
-		Основная функция экспорта, содержит основную логику экспорта
-	*/
-	public function export(){
+        $differs = false;
+        $pairs_differ = array();
 
+        foreach ($children as $_id) {
 
-		if( !$this->isLock() ){
+            $_variation = get_product($_id);
 
-			$this->exportLock();
+            if ($_variation->variation_id == $variation->variation_id)
+                continue;
 
-			if(  $this->inProcess() ){
 
-				$this->bread('in process');
-			
-				$this->renderPartOffers();
-			
-			}else{
+            $pair_differs = false;
 
-				$this->bread('not in process');
-			
+            foreach ($variation->variation_data as $attr => $value) {
 
-				$this->bread('check time true');
+                foreach ($_variation->variation_data as $attr_compare => $value_compare) {
 
-				$this->inProcessSet('yes');
-				$this->renderPartOffers();
-			
-			}
+                    if ($attr === $attr_compare && $value !== $value_compare) {
+                        $pair_differs = true;
+                        break;
+                    }
 
-			if( $this->isMakeYml ){
+                }
 
-				$this->bread('is ismakeyml true');
-			
-				$this->inProcessSet('no');
-				$this->setPage(1);
-			}
+                if ($pair_differs)
+                    break;
 
-			$this->exportUnlock();
-		}else{
-			$this->bread('process is lock');
-		}
-	}
+            }
 
+            $pairs_differ[] = $pair_differs;
 
-	/*
-		Получает заголовки YML фаила
-	*/
-	final public function renderHead( $arg ){
+        }
 
-		extract( $arg );
+        $differs = in_array(false, $pairs_differ) ? false : true;
 
-		echo '<?xml version="1.0" encoding="utf-8"?>
+        return $differs;
+
+    }
+
+    final public function getShellArg()
+    {
+
+        /* В версии php ниже 5.3 не работают ключи с длинным именем, поэтому просто забиваем на эту версию */
+        $shell_arg = @getopt("", array("wooexportyml_" . $this->shellPrefix . "::", "debug::", "unlock::", 'fullexport::', "unittests::"));
+
+        if (empty($shell_arg))
+            $shell_arg = array();
+        else
+            $shell_arg = array_keys($shell_arg);
+
+
+        return $shell_arg;
+    }
+
+    /*
+        Интерфейс для shell оболочки
+        Ключи:
+        --wooexportyml - Основной и обязательный, без него выгрузка не будет работать.
+        --debug        - вывод отладочной информации
+        --unlock       - разблокирует выгрузку если произошел сбой во время процесса и выгрузка будет начата сначала при следующем запуске
+        --fullexport   - Экспорт без учета времени последней выгрузки, а так же будет произведена выгрузка сразу всех товаров, а не партиями
+    */
+    public function shell()
+    {
+
+        global $wpdb;
+
+        $shell_arg = $this->getShellArg();
+
+
+        if (in_array('wooexportyml_' . $this->shellPrefix, $shell_arg)) {
+
+
+            if (in_array('unlock', $shell_arg)) {
+                $this->action_unlock();
+                die;
+            }
+
+            if (in_array('debug', $shell_arg)) {
+                $this->debugOn();
+            }
+
+            if (in_array('unittests', $shell_arg)) {
+
+                $this->unitTests->process();
+
+                die;
+            }
+
+
+            $this->action_fullexport();
+            die;
+        }
+    }
+
+    /*
+        Действие, которые разблокирует выгрузку
+    */
+    public function action_unlock()
+    {
+
+        $this->inProcessSet('no');
+        $this->setPage(1);
+        $this->exportUnlock();
+
+    }
+
+    /*
+        Экспорт без учета времени последней выгрузки, а так же будет произведена выгрузка сразу всех товаров, а не партиями
+    */
+    public function action_fullexport()
+    {
+
+        $this->inProcessSet('no');
+        $this->setPage(1);
+        $this->exportUnlock();
+
+        while (!$this->isMakeYml)
+            $this->export();
+
+    }
+
+    /*
+        Основная функция экспорта, содержит основную логику экспорта
+    */
+    public function export()
+    {
+
+
+        if (!$this->isLock()) {
+
+            $this->exportLock();
+
+            if ($this->inProcess()) {
+
+                $this->bread('in process');
+
+                $this->renderPartOffers();
+
+            } else {
+
+                $this->bread('not in process');
+
+
+                $this->bread('check time true');
+
+                $this->inProcessSet('yes');
+                $this->renderPartOffers();
+
+            }
+
+            if ($this->isMakeYml) {
+
+                $this->bread('is ismakeyml true');
+
+                $this->inProcessSet('no');
+                $this->setPage(1);
+            }
+
+            $this->exportUnlock();
+        } else {
+            $this->bread('process is lock');
+        }
+    }
+
+
+    /*
+        Получает заголовки YML фаила
+    */
+    final public function renderHead($arg)
+    {
+
+        extract($arg);
+
+        echo '<?xml version="1.0" encoding="utf-8"?>
 
 		<!DOCTYPE yml_catalog SYSTEM "shops.dtd">
-		<yml_catalog date="'.date("Y-m-d H:i").'">
+		<yml_catalog date="' . date("Y-m-d H:i") . '">
 			<shop>
-				<name>'.$name.'</name>
-				<company>'.$desc.'</company>
-				<url>'.$siteurl.'</url>
+				<name>' . $name . '</name>
+				<company>' . $desc . '</company>
+				<url>' . $siteurl . '</url>
 				<currencies>
-					'.$this->renderCurrency().'
+					' . $this->renderCurrency() . '
 				</currencies>
-				'.$this->renderCats().'
+				' . $this->renderCats() . '
 				<offers>
 		';
 
-	}
+    }
 
 
+    /*
+        Закрывает YML фаил
+    */
+    final public function renderFooter()
+    {
 
-	/*
-		Закрывает YML фаил
-	*/
-	final public function renderFooter(){
-		
-		echo '
+        echo '
 				</offers>
 			</shop>
 		</yml_catalog>
 		';
 
-	}
-
-	final public function renderOffers(){
-		
-		global $wpdb;
-
-		$ids = $this->getIdsForExport();
-		$ids = implode(',',$ids->posts);
+    }
 
-		$offers = $wpdb->get_results("select DISTINCT meta_value, post_id from {$wpdb->prefix}postmeta where meta_key='".$this->id."_yml_offer' and post_id in ($ids)");
-		
-		foreach ($offers as $offer ) 
-			echo apply_filters($this->id.'_renderOffers',  $offer->meta_value, $offer->post_id );
-		
-	}
+    final public function renderOffers()
+    {
 
+        global $wpdb;
 
-	/*
-		Отдает Yml
-	*/
-	final public function getYml($gzip = false){
+        $ids = $this->getIdsForExport();
+        $ids = implode(',', $ids->posts);
 
-		if( $gzip ){
+        $offers = $wpdb->get_results("select DISTINCT meta_value, post_id from {$wpdb->prefix}postmeta where meta_key='" . $this->id . "_yml_offer' and post_id in ($ids)");
 
-			header('content-type: application/gzip');
-			ob_start();
-		
-		}else
-			header ("Content-Type:text/xml; charset=utf-8");
-		
+        foreach ($offers as $offer)
+            echo apply_filters($this->id . '_renderOffers', $offer->meta_value, $offer->post_id);
 
+    }
 
-		$arg = array(
-			'name' 		=> ( get_option($this->id.'_title') ) ? get_option($this->id.'_title') : get_option('blogname'),
-			'desc' 		=> ( get_option($this->id.'_desc') ) ? get_option($this->id.'_desc') : get_option('blogdescription'),
-			'siteurl' 	=> esc_attr(site_url()),
-			'this' 		=> $this,
-		);
 
-		$arg = apply_filters( $this->id.'_make_yml_arg', $arg );
-		
-		$this->renderHead( $arg );
-		$this->renderOffers( $parts );
-		$this->renderFooter();
+    /*
+        Отдает Yml
+    */
+    final public function getYml($gzip = false)
+    {
 
-		if( $gzip )
-			WooExportYmlFunctions::print_gzencode_output( $this->id.'.xml.gz');
+        if ($gzip) {
 
-	}
+            header('content-type: application/gzip');
+            ob_start();
 
+        } else
+            header("Content-Type:text/xml; charset=utf-8");
 
-	final public function getIdsForExport(){
 
-		$this->bread('Generate ids');
+        $arg = array(
+            'name' => (get_option($this->id . '_title')) ? get_option($this->id . '_title') : get_option('blogname'),
+            'desc' => (get_option($this->id . '_desc')) ? get_option($this->id . '_desc') : get_option('blogdescription'),
+            'siteurl' => esc_attr(site_url()),
+            'this' => $this,
+        );
 
-		$args = array(
-			'posts_per_page' 	=> -1, 
-			'post_status' 		=> 'publish',
-			'post_type' 		=> array('product', 'product_variation'),
-			'fields' 			=> 'ids',
-			'tax_query' => array(
-				array(
-					'taxonomy' => 'product_type',
-					'field' => 'slug',
-					'terms' => array('simple', 'product_variation'),
-				)
-			),
-			'meta_query' => array(
-				array(
-					'key' => '_price',
-					'value' => '0',
-					'compare' => '>',
-				),
-			)
-		);
+        $arg = apply_filters($this->id . '_make_yml_arg', $arg);
 
+        $this->renderHead($arg);
+        $this->renderOffers($parts);
+        $this->renderFooter();
 
-		$relations = $this->getRelationsTax();
+        if ($gzip)
+            WooExportYmlFunctions::print_gzencode_output($this->id . '.xml.gz');
 
-		foreach ($relations as $tax => $terms) {
+    }
 
-			if( !empty( $terms ) ){
 
-				if( !in_array( 'all', $terms ) )
-					$args['tax_query'][] = array(
-						'taxonomy' => $tax,
-						'field' => 'term_id',
-						'terms' => $terms
-					);
+    final public function getIdsForExport()
+    {
 
-				else if( $tax == 'product_cat' and in_array( 'all', $terms ) ){
+        $this->bread('Generate ids');
 
-					$get_terms = get_terms( $tax );
-					$terms = array();
+        $args = array(
+            'posts_per_page' => -1,
+            'post_status' => 'publish',
+            'post_type' => array('product', 'product_variation'),
+            'fields' => 'ids',
+            'tax_query' => array(
+                array(
+                    'taxonomy' => 'product_type',
+                    'field' => 'slug',
+                    'terms' => array('simple', 'product_variation'),
+                )
+            ),
+            'meta_query' => array(
+                array(
+                    'key' => '_price',
+                    'value' => '0',
+                    'compare' => '>',
+                ),
+            )
+        );
 
-					foreach( $get_terms as $term )
-						$terms[] = $term->term_id;
 
-					$args['tax_query'][] = array(
-						'taxonomy' => $tax,
-						'field' => 'term_id',
-						'terms' => $terms
-					);					
-				}
+        $relations = $this->getRelationsTax();
 
-			}
-		}
+        foreach ($relations as $tax => $terms) {
 
+            if (!empty($terms)) {
 
+                if (!in_array('all', $terms))
+                    $args['tax_query'][] = array(
+                        'taxonomy' => $tax,
+                        'field' => 'term_id',
+                        'terms' => $terms
+                    );
 
-		$args = apply_filters( $this->id . '_make_query_get_ids', $args );
-		$products_ids  = new WP_Query( $args );
+                else if ($tax == 'product_cat' and in_array('all', $terms)) {
 
-		$variations_ids = $this->getVariationsIds();
+                    $get_terms = get_terms($tax);
+                    $terms = array();
 
-		$ids = new WP_Query();
-		$ids->posts = array_merge( $products_ids->posts, $variations_ids->posts );
-		$ids->post_count = $products_ids->post_count + $variations_ids->post_count;
+                    foreach ($get_terms as $term)
+                        $terms[] = $term->term_id;
 
-		return $ids;
-	}
+                    $args['tax_query'][] = array(
+                        'taxonomy' => $tax,
+                        'field' => 'term_id',
+                        'terms' => $terms
+                    );
+                }
 
-	final public function getVariationsIds(){
+            }
+        }
 
-		$args = array(
-			'posts_per_page' 	=> -1, 
-			'post_status' 		=> 'publish',
-			'post_type' 		=> array('product_variation'),
-			'fields' 			=> 'ids',
-			'meta_query' => array(
-				array(
-					'key' => '_price',
-					'value' => '0',
-					'compare' => '>',
-				),
-			)
-		);
 
-		return new WP_Query($args);
-	}
+        $args = apply_filters($this->id . '_make_query_get_ids', $args);
+        $products_ids = new WP_Query($args);
 
-	/*
-		Создает запрос для выгрузки
-	*/
-	final public function makeQuery(){
+        $variations_ids = $this->getVariationsIds();
 
-		if( $this->currentpage == 1 ){
+        $ids = new WP_Query();
+        $ids->posts = array_merge($products_ids->posts, $variations_ids->posts);
+        $ids->post_count = $products_ids->post_count + $variations_ids->post_count;
 
-			$ids = $this->getIdsForExport();
-			$this->posts = $ids->posts;
-			update_option($this->id.'_get_ids', $this->posts );
-			
+        return $ids;
+    }
 
-		}
+    final public function getVariationsIds()
+    {
 
+        $args = array(
+            'posts_per_page' => -1,
+            'post_status' => 'publish',
+            'post_type' => array('product_variation'),
+            'fields' => 'ids',
+            'meta_query' => array(
+                array(
+                    'key' => '_price',
+                    'value' => '0',
+                    'compare' => '>',
+                ),
+            )
+        );
 
-		$this->bread( 'Current page - ' . $this->currentpage );
+        return new WP_Query($args);
+    }
 
-		$shell_arg = $this->getShellArg();
+    /*
+        Создает запрос для выгрузки
+    */
+    final public function makeQuery()
+    {
 
-		$perpage = ( in_array( 'wooexportyml', $shell_arg ) ) ? 500 : 150;
+        if ($this->currentpage == 1) {
 
-		$args = array(
-			'post__in' 			=> (array)$this->posts,
-			'posts_per_page' 	=> $perpage, 
-			'paged' 			=> $this->currentpage,
-			'post_type' 		=> array('product', 'product_variation'),
-		);
+            $ids = $this->getIdsForExport();
+            $this->posts = $ids->posts;
+            update_option($this->id . '_get_ids', $this->posts);
 
-		// Когда всего 200 товаров, нет смысла выгружать партиями.
-		if( (int)$get_ids->found_posts >= 200 ){
-			$args['posts_per_page'] == 200;
-		}
 
-		$args = apply_filters( $this->id . '_make_query_get_products', $args );
+        }
 
-		$query = new WP_Query( $args );
-		update_option( $this->id . '_pages', $query->max_num_pages );
 
-		return $query;
-		
-	}
+        $this->bread('Current page - ' . $this->currentpage);
 
+        $shell_arg = $this->getShellArg();
 
-	/*
-		Получает список таксономий
-	*/
-	final public function getRelationsTax(){
-		
-		$tax = get_taxonomies( array('object_type' => array('product') ), 'objects' );
+        $perpage = (in_array('wooexportyml', $shell_arg)) ? 500 : 150;
 
-		$relations = array();
+        $args = array(
+            'post__in' => (array)$this->posts,
+            'posts_per_page' => $perpage,
+            'paged' => $this->currentpage,
+            'post_type' => array('product', 'product_variation'),
+        );
 
-		foreach ($tax as $key => $tax_val) {
+        // Когда всего 200 товаров, нет смысла выгружать партиями.
+        if ((int)$get_ids->found_posts >= 200) {
+            $args['posts_per_page'] == 200;
+        }
 
-			if( $key == 'product_type' )
-				continue;
+        $args = apply_filters($this->id . '_make_query_get_products', $args);
 
-			if( strripos($key, 'pa_') !== false )
-				continue;
+        $query = new WP_Query($args);
+        update_option($this->id . '_pages', $query->max_num_pages);
 
-			$relations[$key] = get_option($this->id.'_tax_'.$key );
+        return $query;
 
+    }
 
-		}
 
-		if( !isset( $relations['product_cat'] ) )
-			$relations['product_cat'] = array();
+    /*
+        Получает список таксономий
+    */
+    final public function getRelationsTax()
+    {
 
+        $tax = get_taxonomies(array('object_type' => array('product')), 'objects');
 
+        $relations = array();
 
-		$options = get_option( $this->id.'_filters' );
+        foreach ($tax as $key => $tax_val) {
 
-		if( !empty( $options ) ){
-			foreach ($options as $key => $value) {
-				if( in_array('notfiltered', $value) )
-					continue;
+            if ($key == 'product_type')
+                continue;
 
-				$relations[$key] = $value;
-			}
-		}
+            if (strripos($key, 'pa_') !== false)
+                continue;
 
-		return $relations;
+            $relations[$key] = get_option($this->id . '_tax_' . $key);
 
-	}
 
+        }
 
+        if (!isset($relations['product_cat']))
+            $relations['product_cat'] = array();
 
 
+        $options = get_option($this->id . '_filters');
 
-	public function ajaxUpdateOffers(){
+        if (!empty($options)) {
+            foreach ($options as $key => $value) {
+                if (in_array('notfiltered', $value))
+                    continue;
 
-		if( $_POST['unlock'] == 'yes' ){
-			$this->action_unlock();
-		}
-		
-		$this->export();
+                $relations[$key] = $value;
+            }
+        }
 
-		echo json_encode(array( 'ismakeyml' => $this->isMakeYml, 'bread' => $this->bread ));
-		die;
-	}
+        return $relations;
 
-	final public function generateOffer( $meta_id, $post_id ){
+    }
 
-		$product = get_product ( $post_id );
-		$this->renderPartOffer( $product );
-	}
 
-	final public function wp_insert_post( $post_id, $post ){
+    public function ajaxUpdateOffers()
+    {
 
-		if( $post->post_type == 'product'){
+        if ($_POST['unlock'] == 'yes') {
+            $this->action_unlock();
+        }
 
-			$product = get_product( $post_id );
+        $this->export();
 
-			$this->renderPartOffer( $product );
-		}
+        echo json_encode(array('ismakeyml' => $this->isMakeYml, 'bread' => $this->bread));
+        die;
+    }
 
-	}
+    final public function generateOffer($meta_id, $post_id)
+    {
 
-	final public function set_object_terms( $post_id ){
+        $product = get_product($post_id);
+        $this->renderPartOffer($product);
+    }
 
-		$post = get_post( $post_id );
+    final public function wp_insert_post($post_id, $post)
+    {
 
-		if( $post->post_type == 'product' ){
+        if ($post->post_type == 'product') {
 
-			$product = get_product( $post_id );
+            $product = get_product($post_id);
 
-			$this->renderPartOffer( $product );
-		}
+            $this->renderPartOffer($product);
+        }
 
-	}
+    }
+
+    final public function set_object_terms($post_id)
+    {
+
+        $post = get_post($post_id);
+
+        if ($post->post_type == 'product') {
+
+            $product = get_product($post_id);
+
+            $this->renderPartOffer($product);
+        }
+
+    }
 
 }
